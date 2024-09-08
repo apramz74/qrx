@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import QRCode from "qrcode";
 import styles from "./QRCodeGenerator.module.css";
+import { supabase } from "../supabaseClient"; // Make sure to import supabase client
 
 const QRCodeGenerator = () => {
   const [content, setContent] = useState("");
@@ -8,21 +9,58 @@ const QRCodeGenerator = () => {
   const [backgroundColor, setBackgroundColor] = useState("#FFFFFF");
   const canvasRef = useRef(null);
 
-  const handleGenerate = () => {
-    QRCode.toCanvas(
-      canvasRef.current,
-      content,
-      {
-        width: 256,
-        color: {
-          dark: foregroundColor,
-          light: backgroundColor,
+  const createQRCode = async (
+    userId,
+    content,
+    foregroundColor,
+    backgroundColor
+  ) => {
+    try {
+      const { data, error } = await supabase
+        .from("qr_codes")
+        .insert({
+          content: content,
+          foreground_color: foregroundColor,
+          background_color: backgroundColor,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error("Error saving QR code to database:", error);
+      throw error;
+    }
+  };
+
+  const handleGenerate = async () => {
+    try {
+      const userId = "current-user-id"; // Get this from your auth system
+      const qrCode = await createQRCode(
+        userId,
+        content,
+        foregroundColor,
+        backgroundColor
+      );
+
+      QRCode.toCanvas(
+        canvasRef.current,
+        qrCode.content,
+        {
+          width: 256,
+          color: {
+            dark: qrCode.foreground_color,
+            light: qrCode.background_color,
+          },
         },
-      },
-      (error) => {
-        if (error) console.error(error);
-      }
-    );
+        (error) => {
+          if (error) console.error(error);
+        }
+      );
+    } catch (error) {
+      console.error("Error generating QR code:", error);
+    }
   };
 
   return (
