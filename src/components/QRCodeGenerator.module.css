@@ -28,3 +28,16 @@
 .generateButton:hover {
   background-color: #0056b3;
 }
+
+.qrCodeDisplay {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qrImage {
+  max-width: 256px;
+  height: auto;
+  margin-bottom: 10px;
+}

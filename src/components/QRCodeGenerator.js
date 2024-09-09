@@ -1,27 +1,39 @@
-import React, { useState, useRef } from "react";
-import QRCode from "qrcode";
+import React, { useState } from "react";
 import styles from "./QRCodeGenerator.module.css";
-import { supabase } from "../supabaseClient"; // Make sure to import supabase client
+import { supabase } from "../supabaseClient";
+import { generateQRCode } from "../utils/qrCodeGenerator";
 
 const QRCodeGenerator = () => {
   const [content, setContent] = useState("");
   const [foregroundColor, setForegroundColor] = useState("#000000");
   const [backgroundColor, setBackgroundColor] = useState("#FFFFFF");
-  const canvasRef = useRef(null);
+  const [qrCodeImage, setQrCodeImage] = useState("");
 
-  const createQRCode = async (
-    userId,
-    content,
-    foregroundColor,
-    backgroundColor
-  ) => {
+  const createQRCode = async (content, foregroundColor, backgroundColor) => {
     try {
+      const qrCodeId = crypto.randomUUID(); // Generate a unique ID for the QR code
+      const redirectUrl = content; // Use the content as the redirect URL
+      const trackingUrl = `${
+        process.env.NEXT_PUBLIC_APP_URL
+      }/api/track-visit?qr_code_id=${encodeURIComponent(
+        qrCodeId
+      )}&redirect_url=${encodeURIComponent(redirectUrl)}`;
+
+      const qrCodeDataUrl = await generateQRCode(
+        trackingUrl,
+        foregroundColor,
+        backgroundColor
+      );
+
       const { data, error } = await supabase
         .from("qr_codes")
         .insert({
+          id: qrCodeId,
           content: content,
           foreground_color: foregroundColor,
           background_color: backgroundColor,
+          qr_code_url: qrCodeDataUrl,
+          redirect_url: redirectUrl,
         })
         .select()
         .single();
@@ -36,28 +48,14 @@ const QRCodeGenerator = () => {
 
   const handleGenerate = async () => {
     try {
-      const userId = "current-user-id"; // Get this from your auth system
       const qrCode = await createQRCode(
-        userId,
         content,
         foregroundColor,
         backgroundColor
       );
 
-      QRCode.toCanvas(
-        canvasRef.current,
-        qrCode.content,
-        {
-          width: 256,
-          color: {
-            dark: qrCode.foreground_color,
-            light: qrCode.background_color,
-          },
-        },
-        (error) => {
-          if (error) console.error(error);
-        }
-      );
+      setQrCodeImage(qrCode.qr_code_url);
+      console.log("QR code generated:", qrCode);
     } catch (error) {
       console.error("Error generating QR code:", error);
     }
@@ -66,7 +64,7 @@ const QRCodeGenerator = () => {
   return (
     <div className={styles.container}>
       <div className={styles.inputGroup}>
-        <label htmlFor="content">QR Code Content</label>
+        <label htmlFor="content">QR Code Content (URL or text)</label>
         <input
           id="content"
           type="text"
@@ -96,7 +94,25 @@ const QRCodeGenerator = () => {
       <button className={styles.generateButton} onClick={handleGenerate}>
         Generate QR Code
       </button>
-      <canvas ref={canvasRef} className={styles.qrCanvas}></canvas>
+
+      {qrCodeImage && (
+        <div className={styles.qrCodeDisplay}>
+          <img
+            src={qrCodeImage}
+            alt="Generated QR Code"
+            className={styles.qrImage}
+          />
+          <div className={styles.downloadSection}>
+            <a
+              href={qrCodeImage}
+              download="qrcode.png"
+              className={styles.downloadButton}
+            >
+              Download QR Code
+            </a>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
